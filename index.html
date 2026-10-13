@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>おさいふ わけわけ</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 :root{
   --bg:#f1f5f3; --card:#ffffff; --text:#17212b; --sub:#6b7a85; --line:#dfe7e3;
@@ -31,6 +32,7 @@
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px);}
 *,*::before,*::after{box-sizing:inherit;}
+[hidden]{display:none !important;}
 body{
   margin:0; background:var(--bg); color:var(--text);
   font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Hiragino Sans','Yu Gothic',sans-serif;
@@ -41,14 +43,12 @@ body{
 h1{font-size:18px; font-weight:700; margin:0;}
 .num{font-variant-numeric:tabular-nums; letter-spacing:.01em;}
 
-/* 同期ステータス */
 .sync{font-size:12px; color:var(--sub); display:inline-flex; align-items:center; gap:6px; white-space:nowrap;}
 .sync::before{content:''; width:8px; height:8px; border-radius:50%; background:var(--line);}
 .sync.m-sync::before{background:var(--save);}
-.sync.m-local::before{background:var(--allow);}
-.sync-hint{font-size:12px; color:var(--allow-ink); background:var(--allow-soft); border-radius:10px; padding:8px 12px; margin:-4px 0 12px;}
+.sync.m-error::before{background:var(--out);}
+.sync.m-connecting::before,.sync.m-login::before{background:var(--allow);}
 
-/* 合計とわけ棒 */
 .total{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px 18px 16px;}
 .total .label{color:var(--sub); font-size:13px;}
 .total .amount{font-size:36px; font-weight:700; line-height:1.2; margin:2px 0 14px;}
@@ -60,7 +60,6 @@ h1{font-size:18px; font-weight:700; margin:0;}
 .legend b{color:var(--text); font-weight:500;}
 .dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px;}
 
-/* 2つの財布 */
 .wallets{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
 .w{border-radius:14px; padding:12px 14px;}
 .w.allow{background:var(--allow-soft); color:var(--allow-ink);}
@@ -68,10 +67,10 @@ h1{font-size:18px; font-weight:700; margin:0;}
 .w .n{font-size:13px;}
 .w .v{font-size:22px; font-weight:700; margin-top:2px; word-break:break-all;}
 
-/* フォーム */
 .panel{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin-top:14px;}
 .panel.editing{border-color:var(--allow); box-shadow:0 0 0 3px var(--allow-soft);}
 .panel h2{font-size:15px; margin:0 0 10px; font-weight:700;}
+.panel p.note{font-size:13px; color:var(--sub); margin:0 0 12px;}
 .seg{display:flex; background:var(--field); border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px; margin-bottom:10px;}
 .seg button{flex:1; border:0; background:transparent; color:var(--sub); font:inherit; font-size:14px; padding:9px 4px; border-radius:9px; cursor:pointer; min-height:40px;}
 .seg button.on{background:var(--card); color:var(--text); font-weight:700; box-shadow:0 0 0 1px var(--line);}
@@ -79,12 +78,13 @@ h1{font-size:18px; font-weight:700; margin:0;}
 .seg.wal button.on[data-wallet="save"]{background:var(--save); color:#fff; box-shadow:none;}
 .hint{font-size:12px; color:var(--sub); margin:-2px 0 10px;}
 label.f{display:block; font-size:12px; color:var(--sub); margin:0 0 4px;}
-input[type=number],input[type=text],input[type=date],textarea{
+input[type=number],input[type=text],input[type=date],input[type=email],input[type=password],textarea{
   width:100%; font:inherit; font-size:16px; color:var(--text); background:var(--field);
   border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-height:44px;
 }
 textarea{min-height:90px; font-size:12px; resize:vertical;}
 .row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
+.field{margin-bottom:12px;}
 .main-btn{width:100%; border:0; background:var(--btn); color:var(--btn-text); font:inherit; font-size:16px; font-weight:700; border-radius:12px; padding:12px; min-height:48px; cursor:pointer;}
 .main-btn:disabled{opacity:.5; cursor:default;}
 .sub-btn{border:1px solid var(--line); background:var(--field); color:var(--text); font:inherit; font-size:14px; border-radius:10px; padding:9px 14px; min-height:42px; cursor:pointer;}
@@ -93,7 +93,6 @@ textarea{min-height:90px; font-size:12px; resize:vertical;}
 #cancelBtn{width:100%; margin-top:8px;}
 button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--save); outline-offset:2px;}
 
-/* 履歴 */
 .hist-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
 .hist-head h2{margin:0;}
 .chips{display:flex; gap:6px;}
@@ -115,7 +114,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
 .act.del.armed{color:var(--out); font-weight:700;}
 .empty{color:var(--sub); font-size:14px; padding:14px 0 6px; text-align:center;}
 
-/* 設定 */
 details.panel summary{cursor:pointer; font-size:15px; font-weight:700; list-style:none; min-height:28px;}
 details.panel summary::-webkit-details-marker{display:none;}
 details.panel summary::after{content:'＋'; float:right; color:var(--sub);}
@@ -124,6 +122,7 @@ details.panel[open] summary::after{content:'－';}
 .diff{font-size:14px; margin-top:8px;}
 .diff.ok{color:var(--in);} .diff.ng{color:var(--out);}
 .btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+.who{font-size:13px; color:var(--sub); margin-bottom:8px; overflow-wrap:anywhere;}
 .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom,0px)); background:var(--btn); color:var(--btn-text); padding:10px 18px; border-radius:999px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s; max-width:92vw; text-align:center;}
 .toast.show{opacity:1;}
 @media (prefers-reduced-motion: reduce){ .split div{transition:none;} }
@@ -133,100 +132,138 @@ details.panel[open] summary::after{content:'－';}
 <div class="wrap">
   <div class="top">
     <h1>おさいふ わけわけ</h1>
-    <span class="sync m-pending" id="sync" role="status">準備中…</span>
-  </div>
-  <div class="sync-hint" id="syncHint" hidden>いまはこの端末のブラウザの中だけに保存されています。claude.ai にログインした状態でこのページを開くと、別のブラウザとも自動で同期されます。</div>
-
-  <section class="total" aria-label="口座の合計">
-    <div class="label">口座に入っているお金（合計）</div>
-    <div class="amount num" id="total">¥0</div>
-    <div class="split" id="split" role="img" aria-label="お小遣いと貯金の割合">
-      <div class="a" id="barA" style="width:50%"></div>
-      <div class="s" id="barS" style="width:50%"></div>
-    </div>
-    <div class="legend">
-      <span><span class="dot" style="background:var(--allow)"></span>お小遣い <b id="pctA">-</b></span>
-      <span><span class="dot" style="background:var(--save)"></span>家の貯金 <b id="pctS">-</b></span>
-    </div>
-  </section>
-
-  <div class="wallets">
-    <div class="w allow"><div class="n">お小遣い</div><div class="v num" id="balA">¥0</div></div>
-    <div class="w save"><div class="n">家の貯金</div><div class="v num" id="balS">¥0</div></div>
+    <span class="sync m-connecting" id="sync" role="status">接続中…</span>
   </div>
 
-  <section class="panel" id="formPanel">
-    <h2 id="formTitle">記録する</h2>
-    <div class="seg" id="kindSeg">
-      <button type="button" data-kind="out" class="on">出金</button>
-      <button type="button" data-kind="in">入金</button>
-      <button type="button" data-kind="move">財布間の移動</button>
-    </div>
-    <div class="seg wal" id="walSeg">
-      <button type="button" data-wallet="allow" class="on">お小遣い</button>
-      <button type="button" data-wallet="save">家の貯金</button>
-    </div>
-    <div class="hint" id="moveHint" hidden></div>
-    <div class="row">
-      <div><label class="f" for="amount">金額（円）</label><input type="number" id="amount" inputmode="numeric" min="1" step="1" placeholder="1000"></div>
-      <div><label class="f" for="date">日付</label><input type="date" id="date"></div>
-    </div>
-    <div style="margin-bottom:12px"><label class="f" for="memo">メモ（なくてもOK）</label><input type="text" id="memo" maxlength="60" placeholder="例：コンビニ、お年玉"></div>
-    <button type="button" class="main-btn" id="addBtn">記録する</button>
-    <button type="button" class="sub-btn" id="cancelBtn" hidden>編集をやめる</button>
+  <!-- 接続設定（コードに URL とキーを書いていない場合だけ表示） -->
+  <section class="panel" id="setupView" hidden>
+    <h2>Supabase の接続設定</h2>
+    <p class="note">Supabase の「Project URL」と「anon public キー」を入れてください。この端末のブラウザに保存されます。（index.html の上のほうに直接書いておけば、この画面は出ません）</p>
+    <div class="field"><label class="f" for="setupUrl">Project URL</label><input type="text" id="setupUrl" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="field"><label class="f" for="setupKey">anon public キー</label><input type="text" id="setupKey" placeholder="eyJ..." autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <button type="button" class="main-btn" id="setupBtn">保存して始める</button>
   </section>
 
-  <section class="panel">
-    <div class="hist-head">
-      <h2>履歴</h2>
-      <div class="chips" id="chips">
-        <button type="button" data-f="all" class="on">すべて</button>
-        <button type="button" data-f="allow">お小遣い</button>
-        <button type="button" data-f="save">貯金</button>
-      </div>
-    </div>
-    <div id="list"></div>
+  <!-- ログイン -->
+  <section class="panel" id="loginView" hidden>
+    <h2>ログイン</h2>
+    <p class="note">家計のデータを守るため、ログインした本人だけが見られるようにしています。</p>
+    <div class="field"><label class="f" for="email">メールアドレス</label><input type="email" id="email" autocomplete="username" autocapitalize="off"></div>
+    <div class="field"><label class="f" for="password">パスワード</label><input type="password" id="password" autocomplete="current-password"></div>
+    <button type="button" class="main-btn" id="loginBtn">ログイン</button>
   </section>
 
-  <details class="panel">
-    <summary>設定・バックアップ</summary>
-
-    <div class="set-block" style="border-top:0; margin-top:10px; padding-top:0;">
-      <label class="f">はじめの残高（このツールを使い始めた時点の金額）</label>
-      <div class="row" style="margin-bottom:0">
-        <div><label class="f" for="openA">お小遣い</label><input type="number" id="openA" inputmode="numeric" placeholder="0"></div>
-        <div><label class="f" for="openS">家の貯金</label><input type="number" id="openS" inputmode="numeric" placeholder="0"></div>
+  <!-- 本体 -->
+  <div id="appView" hidden>
+    <section class="total" aria-label="口座の合計">
+      <div class="label">口座に入っているお金（合計）</div>
+      <div class="amount num" id="total">¥0</div>
+      <div class="split" id="split" role="img" aria-label="お小遣いと貯金の割合">
+        <div class="a" id="barA" style="width:50%"></div>
+        <div class="s" id="barS" style="width:50%"></div>
       </div>
-    </div>
-
-    <div class="set-block">
-      <label class="f" for="bank">銀行アプリで見た実際の残高（合計と合っているか確認）</label>
-      <input type="number" id="bank" inputmode="numeric" placeholder="例：128000">
-      <div class="diff" id="diff"></div>
-    </div>
-
-    <div class="set-block">
-      <label class="f">バックアップ（データをテキストで保管・復元）</label>
-      <textarea id="backup" placeholder="「書き出す」を押すと、ここにデータが出ます。復元するときは、保存しておいたテキストをここに貼り付けてください。"></textarea>
-      <div class="btns">
-        <button type="button" class="sub-btn" id="exportBtn">書き出す</button>
-        <button type="button" class="sub-btn warn" id="importBtn">貼り付けた内容で復元</button>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--allow)"></span>お小遣い <b id="pctA">-</b></span>
+        <span><span class="dot" style="background:var(--save)"></span>家の貯金 <b id="pctS">-</b></span>
       </div>
+    </section>
+
+    <div class="wallets">
+      <div class="w allow"><div class="n">お小遣い</div><div class="v num" id="balA">¥0</div></div>
+      <div class="w save"><div class="n">家の貯金</div><div class="v num" id="balS">¥0</div></div>
     </div>
-  </details>
+
+    <section class="panel" id="formPanel">
+      <h2 id="formTitle">記録する</h2>
+      <div class="seg" id="kindSeg">
+        <button type="button" data-kind="out" class="on">出金</button>
+        <button type="button" data-kind="in">入金</button>
+        <button type="button" data-kind="move">財布間の移動</button>
+      </div>
+      <div class="seg wal" id="walSeg">
+        <button type="button" data-wallet="allow" class="on">お小遣い</button>
+        <button type="button" data-wallet="save">家の貯金</button>
+      </div>
+      <div class="hint" id="moveHint" hidden></div>
+      <div class="row">
+        <div><label class="f" for="amount">金額（円）</label><input type="number" id="amount" inputmode="numeric" min="1" step="1" placeholder="1000"></div>
+        <div><label class="f" for="date">日付</label><input type="date" id="date"></div>
+      </div>
+      <div class="field"><label class="f" for="memo">メモ（なくてもOK）</label><input type="text" id="memo" maxlength="60" placeholder="例：コンビニ、お年玉"></div>
+      <button type="button" class="main-btn" id="addBtn">記録する</button>
+      <button type="button" class="sub-btn" id="cancelBtn" hidden>編集をやめる</button>
+    </section>
+
+    <section class="panel">
+      <div class="hist-head">
+        <h2>履歴</h2>
+        <div class="chips" id="chips">
+          <button type="button" data-f="all" class="on">すべて</button>
+          <button type="button" data-f="allow">お小遣い</button>
+          <button type="button" data-f="save">貯金</button>
+        </div>
+      </div>
+      <div id="list"></div>
+    </section>
+
+    <details class="panel">
+      <summary>設定・バックアップ</summary>
+
+      <div class="set-block" style="border-top:0; margin-top:10px; padding-top:0;">
+        <label class="f">はじめの残高（このツールを使い始めた時点の金額）</label>
+        <div class="row" style="margin-bottom:0">
+          <div><label class="f" for="openA">お小遣い</label><input type="number" id="openA" inputmode="numeric" placeholder="0"></div>
+          <div><label class="f" for="openS">家の貯金</label><input type="number" id="openS" inputmode="numeric" placeholder="0"></div>
+        </div>
+      </div>
+
+      <div class="set-block">
+        <label class="f" for="bank">銀行アプリで見た実際の残高（合計と合っているか確認）</label>
+        <input type="number" id="bank" inputmode="numeric" placeholder="例：128000">
+        <div class="diff" id="diff"></div>
+      </div>
+
+      <div class="set-block">
+        <label class="f">バックアップ（データをテキストで保管・復元）</label>
+        <textarea id="backup" placeholder="「書き出す」を押すと、ここにデータが出ます。復元するときは、保存しておいたテキストをここに貼り付けてください。（claude.ai 版で書き出したテキストもそのまま読み込めます）"></textarea>
+        <div class="btns">
+          <button type="button" class="sub-btn" id="exportBtn">書き出す</button>
+          <button type="button" class="sub-btn warn" id="importBtn">貼り付けた内容で復元</button>
+        </div>
+      </div>
+
+      <div class="set-block">
+        <div class="who" id="who"></div>
+        <div class="btns" style="margin-top:0">
+          <button type="button" class="sub-btn" id="logoutBtn">ログアウト</button>
+          <button type="button" class="sub-btn" id="resetCfgBtn" hidden>接続設定をやり直す</button>
+        </div>
+      </div>
+    </details>
+  </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
 (function(){
-  var KEY = 'wakewake-v1';
+  /* ===== 接続設定 =====
+     Supabase の「Project URL」と「anon public キー」をここに書いておくと、
+     どの端末でも自動で接続されます（anon キーは公開されても大丈夫な設計です。
+     データはログイン＋RLS（行ごとのアクセス制限）で守られます）。
+     空のままなら、最初の画面で入力できます。 */
+  var SUPABASE_URL = '';
+  var SUPABASE_ANON_KEY = '';
+  /* ==================== */
+
+  var CFG_URL_KEY = 'wakewake-sb-url', CFG_KEY_KEY = 'wakewake-sb-key';
   var NAMES = { allow:'お小遣い', save:'家の貯金' };
   var state = { opening:{allow:0, save:0}, bank:null, tx:[] };
-  var mode = 'pending';          // pending（準備中） / sync（同期オン） / local（この端末のみ）
-  var col = null, checked = false, localAtStart = null;
+  var sb = null, currentUid = null, channel = null;
   var kind = 'out', wallet = 'allow', filter = 'all';
   var armedId = null, armTimer = null, editingId = null;
-  var importArmed = false, importTimer = null, setTimer = null;
+  var importArmed = false, importTimer = null;
+  var setTimer = null, settingsDirty = false;
+  var reloading = false, again = false, reloadTimer = null;
 
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -238,53 +275,43 @@ details.panel[open] summary::after{content:'－';}
   }
   function toast(msg){
     var t = $('toast'); t.textContent = msg; t.classList.add('show');
-    clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+    clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove('show'); }, 2400);
   }
+  function setStatus(m){
+    $('sync').className = 'sync m-' + m;
+    $('sync').textContent = { sync:'同期オン', connecting:'接続中…', login:'ログインが必要', error:'接続できません' }[m] || '';
+  }
+  function showView(v){
+    $('setupView').hidden = (v !== 'setup');
+    $('loginView').hidden = (v !== 'login');
+    $('appView').hidden = (v !== 'app');
+  }
+  function errText(e){ return (e && (e.message || e.error_description)) ? e.message || e.error_description : ''; }
 
-  /* ---------- データの整形 ---------- */
-  function cleanTx(id, v){
-    if (!v) return null;
-    var amount = Math.round(+v.amount);
-    if (!(amount > 0)) return null;
-    var w = v.wallet; if (w !== 'allow' && w !== 'save') return null;
-    var k = v.kind; if (k !== 'in' && k !== 'out' && k !== 'move') return null;
-    var t = {
-      id: String(id),
-      date: (typeof v.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.date)) ? v.date : todayStr(),
-      kind: k, wallet: w, amount: amount,
-      memo: typeof v.memo === 'string' ? v.memo.slice(0, 60) : '',
-      ts: +v.ts || +id || 0
-    };
-    if (k === 'move') t.to = other(w);
+  /* ---------- データの変換 ---------- */
+  function rowToTx(r){
+    var t = { id:r.id, date:r.date, kind:r.kind, wallet:r.wallet, amount:Number(r.amount), memo:r.memo || '', ts:Date.parse(r.created_at) || 0 };
+    if (r.kind === 'move') t.to = other(r.wallet);
     return t;
   }
-  function txBody(t){
-    var b = { date:t.date, kind:t.kind, wallet:t.wallet, amount:t.amount, memo:t.memo, ts:t.ts };
-    if (t.kind === 'move') b.to = t.to;
-    return b;
+  function txBody(t){ return { date:t.date, kind:t.kind, wallet:t.wallet, amount:t.amount, memo:t.memo }; }
+  function cleanImport(v, i){
+    if (!v) return null;
+    var amount = Math.round(+v.amount); if (!(amount > 0)) return null;
+    if (v.wallet !== 'allow' && v.wallet !== 'save') return null;
+    if (v.kind !== 'in' && v.kind !== 'out' && v.kind !== 'move') return null;
+    var row = {
+      date: (typeof v.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.date)) ? v.date : todayStr(),
+      kind: v.kind, wallet: v.wallet, amount: amount,
+      memo: typeof v.memo === 'string' ? v.memo.slice(0, 60) : ''
+    };
+    var ts = +v.ts;
+    if (ts > 0) row.created_at = new Date(ts).toISOString();
+    return row;
   }
   function findTx(id){ id = String(id); for (var i=0;i<state.tx.length;i++){ if (String(state.tx[i].id) === id) return state.tx[i]; } return null; }
-  function indexOfTx(id){ id = String(id); for (var i=0;i<state.tx.length;i++){ if (String(state.tx[i].id) === id) return i; } return -1; }
 
-  /* ---------- この端末の保存（同期オフのときの保存先 兼 キャッシュ） ---------- */
-  function loadLocal(){
-    try {
-      var s = localStorage.getItem(KEY); if (!s) return null;
-      var o = JSON.parse(s); if (!o || !Array.isArray(o.tx)) return null;
-      return {
-        opening: { allow: +(o.opening && o.opening.allow) || 0, save: +(o.opening && o.opening.save) || 0 },
-        bank: (o.bank === null || o.bank === undefined || o.bank === '' || isNaN(+o.bank)) ? null : +o.bank,
-        tx: o.tx.map(function(t){ return cleanTx(t && t.id, t); }).filter(Boolean)
-      };
-    } catch(e){ return null; }
-  }
-  function persistLocal(){
-    try { localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch(e){ if (mode === 'local') toast('保存できませんでした。バックアップを取ってください'); }
-  }
-  function hasData(o){ return !!o && (o.tx.length > 0 || o.opening.allow || o.opening.save || o.bank !== null); }
-
-  /* ---------- 計算 ---------- */
+  /* ---------- 計算と描画 ---------- */
   function balances(){
     var b = { allow: state.opening.allow, save: state.opening.save };
     state.tx.forEach(function(t){
@@ -294,8 +321,6 @@ details.panel[open] summary::after{content:'－';}
     });
     return b;
   }
-
-  /* ---------- 画面の描き直し ---------- */
   function renderBalances(){
     var b = balances(), total = b.allow + b.save;
     $('total').textContent = yen(total);
@@ -346,7 +371,6 @@ details.panel[open] summary::after{content:'－';}
     }).join('');
   }
   function renderAll(){ renderBalances(); renderList(); renderForm(); }
-
   function setIfIdle(el, val){ if (document.activeElement !== el) el.value = val; }
   function syncInputs(){
     setIfIdle($('openA'), state.opening.allow || '');
@@ -354,104 +378,111 @@ details.panel[open] summary::after{content:'－';}
     setIfIdle($('bank'), state.bank === null ? '' : state.bank);
   }
 
-  function setMode(m){
-    mode = m;
-    $('sync').className = 'sync m-' + m;
-    $('sync').textContent = m === 'sync' ? '同期オン' : m === 'local' ? 'この端末のみ' : '準備中…';
-    $('syncHint').hidden = (m !== 'local');
-    var dis = (m === 'pending');
-    ['addBtn','openA','openS','bank','importBtn'].forEach(function(id){ $(id).disabled = dis; });
-  }
-
-  /* ---------- 書き込み（同期オン／この端末のみ を切り替え） ---------- */
-  async function saveTx(id, t){
-    if (mode === 'sync') { var ref = id ? col.doc(String(id)) : col.doc(); await ref.set(txBody(t)); return; }
-    if (mode === 'local') {
-      if (id) { var i = indexOfTx(id); if (i >= 0) state.tx[i] = Object.assign({ id:String(id) }, t); }
-      else state.tx.push(Object.assign({ id:'l' + t.ts }, t));
-      persistLocal(); renderAll(); return;
+  /* ---------- Supabase とのやり取り ---------- */
+  async function fetchAllTx(){
+    var out = [], from = 0, size = 1000;
+    while (true) {
+      var r = await sb.from('wakewake_tx').select('*').order('created_at', { ascending:true }).order('id', { ascending:true }).range(from, from + size - 1);
+      if (r.error) throw r.error;
+      out = out.concat(r.data);
+      if (r.data.length < size) break;
+      from += size;
     }
-    throw new Error('pending');
+    return out;
+  }
+  async function reload(){
+    if (reloading) { again = true; return; }
+    reloading = true;
+    try {
+      do {
+        again = false;
+        var s = await sb.from('wakewake_settings').select('*').maybeSingle();
+        if (s.error) throw s.error;
+        var rows = await fetchAllTx();
+        if (!settingsDirty) {
+          state.opening = { allow: s.data ? Number(s.data.opening_allow) || 0 : 0, save: s.data ? Number(s.data.opening_save) || 0 : 0 };
+          state.bank = (s.data && s.data.bank !== null && s.data.bank !== undefined) ? Number(s.data.bank) : null;
+        }
+        state.tx = rows.map(rowToTx);
+        if (editingId && !findTx(editingId)) exitEdit();
+        syncInputs(); renderAll();
+      } while (again);
+      setStatus('sync');
+    } catch(e){
+      setStatus('error');
+      throw e;
+    } finally {
+      reloading = false;
+    }
+  }
+  function scheduleReload(){
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(function(){ reload().catch(function(){}); }, 300);
+  }
+  async function saveTx(id, t){
+    var r = id ? await sb.from('wakewake_tx').update(txBody(t)).eq('id', id)
+               : await sb.from('wakewake_tx').insert(txBody(t));
+    if (r.error) throw r.error;
+    await reload();
   }
   async function removeTx(id){
-    if (mode === 'sync') { await col.doc(String(id)).delete(); return; }
-    if (mode === 'local') {
-      state.tx = state.tx.filter(function(t){ return String(t.id) !== String(id); });
-      persistLocal(); renderAll(); return;
-    }
-    throw new Error('pending');
+    var r = await sb.from('wakewake_tx').delete().eq('id', id);
+    if (r.error) throw r.error;
+    await reload();
+  }
+  async function writeSettings(){
+    var r = await sb.from('wakewake_settings').upsert({
+      user_id: currentUid,
+      opening_allow: state.opening.allow, opening_save: state.opening.save,
+      bank: state.bank, updated_at: new Date().toISOString()
+    }, { onConflict:'user_id' });
+    if (r.error) throw r.error;
   }
   function queueSettings(){
+    settingsDirty = true;
     clearTimeout(setTimer);
     setTimer = setTimeout(async function(){
-      if (mode === 'sync') {
-        try { await col.doc('settings').set({ opening:{ allow:state.opening.allow, save:state.opening.save }, bank:state.bank }); }
-        catch(e){ toast('設定を保存できませんでした'); }
-      } else if (mode === 'local') persistLocal();
+      try { await writeSettings(); settingsDirty = false; }
+      catch(e){ toast('設定を保存できませんでした'); }
     }, 500);
   }
-  async function replaceAll(ns){
-    if (mode === 'sync') {
-      var old = state.tx.slice();
-      for (var i = 0; i < old.length; i++) { await col.doc(String(old[i].id)).delete(); }
-      await col.doc('settings').set({ opening:ns.opening, bank:ns.bank });
-      for (var j = 0; j < ns.tx.length; j++) { await col.doc().set(txBody(ns.tx[j])); }
-    } else {
-      state = ns; persistLocal(); syncInputs(); renderAll();
+  async function replaceAll(rows, opening, bank){
+    var d = await sb.from('wakewake_tx').delete().eq('user_id', currentUid);
+    if (d.error) throw d.error;
+    for (var i = 0; i < rows.length; i += 500) {
+      var ins = await sb.from('wakewake_tx').insert(rows.slice(i, i + 500));
+      if (ins.error) throw ins.error;
     }
+    state.opening = opening; state.bank = bank;
+    await writeSettings();
+    settingsDirty = false;
+    await reload();
+  }
+  function startRealtime(){
+    stopRealtime();
+    channel = sb.channel('wakewake-live')
+      .on('postgres_changes', { event:'*', schema:'public', table:'wakewake_tx' }, scheduleReload)
+      .on('postgres_changes', { event:'*', schema:'public', table:'wakewake_settings' }, scheduleReload)
+      .subscribe();
+  }
+  function stopRealtime(){
+    if (channel) { try { sb.removeChannel(channel); } catch(e){} channel = null; }
   }
 
-  /* ---------- 同期（claude.ai のデータ保存） ---------- */
-  async function migrate(local){
-    $('sync').textContent = '移行中…';
-    try {
-      await col.doc('settings').set({ opening:local.opening, bank:local.bank });
-      for (var i = 0; i < local.tx.length; i++) { await col.doc().set(txBody(local.tx[i])); }
-      toast('この端末のデータを同期に移しました');
-    } catch(e){ toast('データの移行に失敗しました'); }
-    setMode('sync');
-  }
-  function onSnap(snap){
-    var fromCache = !!(snap.metadata && snap.metadata.fromCache);
-    if (!checked) {
-      if (fromCache && snap.empty) return;       // まだ確定していない空の状態は待つ
-      if (!fromCache) {
-        checked = true;
-        if (snap.empty && hasData(localAtStart)) {  // 初回だけ、この端末のデータを同期側へ移す
-          state = localAtStart; setMode('sync'); syncInputs(); renderAll(); migrate(localAtStart); return;
-        }
-      }
+  /* ---------- ログイン状態 ---------- */
+  async function handleSession(session){
+    if (session && session.user) {
+      if (currentUid === session.user.id) return;
+      currentUid = session.user.id;
+      $('who').textContent = 'ログイン中：' + (session.user.email || '');
+      showView('app'); setStatus('connecting');
+      try { await reload(); startRealtime(); }
+      catch(e){ toast('データを読み込めませんでした。SQLの設定が済んでいるか確認してください'); }
+    } else {
+      currentUid = null; stopRealtime();
+      state = { opening:{allow:0, save:0}, bank:null, tx:[] };
+      exitEdit(); showView('login'); setStatus('login');
     }
-    var settings = null, tx = [];
-    snap.docs.forEach(function(d){
-      var v = d.data(); if (!v) return;
-      if (d.id === 'settings') settings = v;
-      else { var t = cleanTx(d.id, v); if (t) tx.push(t); }
-    });
-    state = {
-      opening: { allow: +(settings && settings.opening && settings.opening.allow) || 0, save: +(settings && settings.opening && settings.opening.save) || 0 },
-      bank: (settings && settings.bank !== null && settings.bank !== undefined && !isNaN(+settings.bank)) ? +settings.bank : null,
-      tx: tx
-    };
-    if (mode !== 'sync') setMode('sync');
-    if (editingId && !findTx(editingId)) exitEdit();
-    persistLocal(); syncInputs(); renderAll();
-  }
-  function onSnapErr(){
-    setMode('local');
-    toast('同期が切れました。この端末のみで動いています');
-  }
-  async function initSync(){
-    if (!(window.claude && typeof window.claude.use === 'function')) { setMode('local'); return; }
-    try {
-      var db = await window.claude.use('db');
-      var user = await window.claude.use('user');
-      if (!db || !user) { setMode('local'); return; }
-      var uid = await user.id();
-      if (!uid) { setMode('local'); return; }
-      col = db.collection('data/users/' + uid);   // 自分だけが読み書きできる場所
-      col.onSnapshot(onSnap, onSnapErr);
-    } catch(e){ setMode('local'); }
   }
 
   /* ---------- 編集 ---------- */
@@ -478,98 +509,152 @@ details.panel[open] summary::after{content:'－';}
   }
 
   /* ---------- イベント ---------- */
-  $('kindSeg').addEventListener('click', function(e){
-    var b = e.target.closest('button'); if (!b) return; kind = b.dataset.kind; renderForm();
-  });
-  $('walSeg').addEventListener('click', function(e){
-    var b = e.target.closest('button'); if (!b) return; wallet = b.dataset.wallet; renderForm();
-  });
-  $('chips').addEventListener('click', function(e){
-    var b = e.target.closest('button'); if (!b) return; filter = b.dataset.f;
-    Array.prototype.forEach.call($('chips').children, function(c){ c.classList.toggle('on', c === b); });
-    renderList();
-  });
-  $('cancelBtn').addEventListener('click', exitEdit);
+  function bindEvents(){
+    $('kindSeg').addEventListener('click', function(e){
+      var b = e.target.closest('button'); if (!b) return; kind = b.dataset.kind; renderForm();
+    });
+    $('walSeg').addEventListener('click', function(e){
+      var b = e.target.closest('button'); if (!b) return; wallet = b.dataset.wallet; renderForm();
+    });
+    $('chips').addEventListener('click', function(e){
+      var b = e.target.closest('button'); if (!b) return; filter = b.dataset.f;
+      Array.prototype.forEach.call($('chips').children, function(c){ c.classList.toggle('on', c === b); });
+      renderList();
+    });
+    $('cancelBtn').addEventListener('click', exitEdit);
 
-  $('addBtn').addEventListener('click', async function(){
-    var btn = this;
-    var amount = parseInt($('amount').value, 10);
-    if (!(amount > 0)) { toast('金額を1円以上で入力してください'); $('amount').focus(); return; }
-    var old = editingId ? findTx(editingId) : null;
-    var t = { date: $('date').value || todayStr(), kind: kind, wallet: wallet, amount: amount, memo: $('memo').value.trim(), ts: old ? old.ts : Date.now() };
-    if (kind === 'move') t.to = other(wallet);
-    var wasEdit = !!editingId;
-    btn.disabled = true;
+    $('addBtn').addEventListener('click', async function(){
+      var btn = this;
+      var amount = parseInt($('amount').value, 10);
+      if (!(amount > 0)) { toast('金額を1円以上で入力してください'); $('amount').focus(); return; }
+      var t = { date: $('date').value || todayStr(), kind: kind, wallet: wallet, amount: amount, memo: $('memo').value.trim() };
+      var wasEdit = !!editingId;
+      btn.disabled = true;
+      try {
+        await saveTx(editingId, t);
+        if (wasEdit) exitEdit(); else { $('amount').value = ''; $('memo').value = ''; }
+        toast(wasEdit ? '直しました' : '記録しました');
+      } catch(e){ toast('保存できませんでした。もう一度お試しください'); }
+      btn.disabled = false;
+    });
+
+    $('list').addEventListener('click', async function(e){
+      var ed = e.target.closest('.edit');
+      if (ed) { startEdit(ed.dataset.id); return; }
+      var b = e.target.closest('.del'); if (!b) return;
+      var id = String(b.dataset.id);
+      if (armedId === id) {
+        armedId = null; clearTimeout(armTimer);
+        try { await removeTx(id); if (editingId === id) exitEdit(); toast('削除しました'); }
+        catch(err){ toast('削除できませんでした'); renderList(); }
+      } else {
+        armedId = id; renderList();
+        clearTimeout(armTimer); armTimer = setTimeout(function(){ armedId = null; renderList(); }, 3000);
+      }
+    });
+
+    function numOrZero(v){ var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+    $('openA').addEventListener('input', function(){ state.opening.allow = numOrZero(this.value); queueSettings(); renderBalances(); });
+    $('openS').addEventListener('input', function(){ state.opening.save = numOrZero(this.value); queueSettings(); renderBalances(); });
+    $('bank').addEventListener('input', function(){
+      var v = parseInt(this.value, 10); state.bank = isNaN(v) ? null : v; queueSettings(); renderBalances();
+    });
+
+    $('exportBtn').addEventListener('click', function(){
+      var ta = $('backup');
+      ta.value = JSON.stringify({
+        opening: state.opening, bank: state.bank,
+        tx: state.tx.map(function(t){ return { date:t.date, kind:t.kind, wallet:t.wallet, amount:t.amount, memo:t.memo, ts:t.ts }; })
+      });
+      ta.focus(); ta.select();
+      try {
+        if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(function(){ toast('コピーしました。メモ帳などに貼って保管してください'); }, function(){ toast('テキストを長押ししてコピーしてください'); });
+        else toast('テキストを長押ししてコピーしてください');
+      } catch(e){ toast('テキストを長押ししてコピーしてください'); }
+    });
+    $('importBtn').addEventListener('click', async function(){
+      var btn = this;
+      if (!importArmed) {
+        importArmed = true; btn.textContent = '今のデータが置き換わります。もう一度押す';
+        clearTimeout(importTimer); importTimer = setTimeout(function(){ importArmed = false; btn.textContent = '貼り付けた内容で復元'; }, 4000);
+        return;
+      }
+      importArmed = false; btn.textContent = '貼り付けた内容で復元'; clearTimeout(importTimer);
+      var rows, opening, bank;
+      try {
+        var o = JSON.parse($('backup').value);
+        if (!o || !Array.isArray(o.tx) || !o.opening) throw new Error('bad');
+        opening = { allow: Math.round(+o.opening.allow) || 0, save: Math.round(+o.opening.save) || 0 };
+        bank = (o.bank === null || o.bank === undefined || isNaN(+o.bank)) ? null : Math.round(+o.bank);
+        rows = o.tx.map(cleanImport).filter(Boolean);
+      } catch(e){ toast('読み込めませんでした。テキストを確認してください'); return; }
+      btn.disabled = true; toast('復元しています…');
+      try { await replaceAll(rows, opening, bank); toast('復元しました'); }
+      catch(e){ toast('復元の途中で失敗しました。もう一度お試しください'); }
+      btn.disabled = false;
+    });
+
+    $('loginBtn').addEventListener('click', login);
+    $('password').addEventListener('keydown', function(e){ if (e.key === 'Enter') login(); });
+    $('logoutBtn').addEventListener('click', async function(){
+      try { await sb.auth.signOut(); } catch(e){}
+      handleSession(null);
+    });
+    $('resetCfgBtn').addEventListener('click', function(){
+      try { localStorage.removeItem(CFG_URL_KEY); localStorage.removeItem(CFG_KEY_KEY); } catch(e){}
+      location.reload();
+    });
+  }
+  async function login(){
+    var email = $('email').value.trim(), password = $('password').value;
+    if (!email || !password) { toast('メールアドレスとパスワードを入れてください'); return; }
+    var btn = $('loginBtn'); btn.disabled = true;
     try {
-      await saveTx(editingId, t);
-      if (wasEdit) exitEdit(); else { $('amount').value = ''; $('memo').value = ''; }
-      toast(wasEdit ? '直しました' : '記録しました');
-    } catch(e){ toast('保存できませんでした。もう一度お試しください'); }
-    btn.disabled = (mode === 'pending');
-  });
-
-  $('list').addEventListener('click', async function(e){
-    var ed = e.target.closest('.edit');
-    if (ed) { startEdit(ed.dataset.id); return; }
-    var b = e.target.closest('.del'); if (!b) return;
-    var id = String(b.dataset.id);
-    if (armedId === id) {
-      armedId = null; clearTimeout(armTimer);
-      try { await removeTx(id); if (editingId === id) exitEdit(); toast('削除しました'); }
-      catch(err){ toast('削除できませんでした'); renderList(); }
-    } else {
-      armedId = id; renderList();
-      clearTimeout(armTimer); armTimer = setTimeout(function(){ armedId = null; renderList(); }, 3000);
-    }
-  });
-
-  function numOrZero(v){ var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
-  $('openA').addEventListener('input', function(){ state.opening.allow = numOrZero(this.value); queueSettings(); renderBalances(); });
-  $('openS').addEventListener('input', function(){ state.opening.save = numOrZero(this.value); queueSettings(); renderBalances(); });
-  $('bank').addEventListener('input', function(){
-    var v = parseInt(this.value, 10); state.bank = isNaN(v) ? null : v; queueSettings(); renderBalances();
-  });
-
-  $('exportBtn').addEventListener('click', function(){
-    var ta = $('backup');
-    ta.value = JSON.stringify({ opening: state.opening, bank: state.bank, tx: state.tx.map(txBody) });
-    ta.focus(); ta.select();
-    try {
-      if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(function(){ toast('コピーしました。メモ帳などに貼って保管してください'); }, function(){ toast('テキストを長押ししてコピーしてください'); });
-      else toast('テキストを長押ししてコピーしてください');
-    } catch(e){ toast('テキストを長押ししてコピーしてください'); }
-  });
-  $('importBtn').addEventListener('click', async function(){
-    var btn = this;
-    if (!importArmed) {
-      importArmed = true; btn.textContent = '今のデータが置き換わります。もう一度押す';
-      clearTimeout(importTimer); importTimer = setTimeout(function(){ importArmed = false; btn.textContent = '貼り付けた内容で復元'; }, 4000);
-      return;
-    }
-    importArmed = false; btn.textContent = '貼り付けた内容で復元'; clearTimeout(importTimer);
-    var ns;
-    try {
-      var o = JSON.parse($('backup').value);
-      if (!o || !Array.isArray(o.tx) || !o.opening) throw new Error('bad');
-      ns = {
-        opening: { allow: +o.opening.allow || 0, save: +o.opening.save || 0 },
-        bank: (o.bank === null || o.bank === undefined || isNaN(+o.bank)) ? null : +o.bank,
-        tx: o.tx.map(function(t, i){ return cleanTx('i' + i, t); }).filter(Boolean)
-      };
-    } catch(e){ toast('読み込めませんでした。テキストを確認してください'); return; }
-    btn.disabled = true; toast('復元しています…');
-    try { await replaceAll(ns); toast('復元しました'); }
-    catch(e){ toast('復元の途中で失敗しました。もう一度お試しください'); }
-    btn.disabled = (mode === 'pending');
-  });
+      var r = await sb.auth.signInWithPassword({ email: email, password: password });
+      if (r.error) { toast('メールアドレスかパスワードが違います'); }
+      else { $('password').value = ''; handleSession(r.data.session); }
+    } catch(e){ toast('ログインできませんでした。通信を確認してください'); }
+    btn.disabled = false;
+  }
 
   /* ---------- 起動 ---------- */
-  localAtStart = loadLocal();
-  if (localAtStart) state = loadLocal();
-  $('date').value = todayStr();
-  syncInputs(); renderAll();
-  setMode('pending');
-  initSync();
+  function getConfig(){
+    var url = SUPABASE_URL, key = SUPABASE_ANON_KEY, fromLocal = false;
+    if (!url || !key) {
+      try { url = localStorage.getItem(CFG_URL_KEY) || ''; key = localStorage.getItem(CFG_KEY_KEY) || ''; fromLocal = !!(url && key); } catch(e){}
+    }
+    return (url && key) ? { url:url.trim(), key:key.trim(), fromLocal:fromLocal } : null;
+  }
+  async function start(){
+    $('date').value = todayStr();
+    bindEvents();
+    renderAll();
+    $('setupBtn').addEventListener('click', function(){
+      var u = $('setupUrl').value.trim(), k = $('setupKey').value.trim();
+      if (!/^https:\/\/.+/.test(u) || !k) { toast('URLとキーを正しく入れてください'); return; }
+      try { localStorage.setItem(CFG_URL_KEY, u); localStorage.setItem(CFG_KEY_KEY, k); } catch(e){ toast('保存できませんでした'); return; }
+      location.reload();
+    });
+
+    var cfg = getConfig();
+    if (!cfg) { showView('setup'); setStatus('login'); $('sync').textContent = '接続設定が必要'; return; }
+    if (!window.supabase || !window.supabase.createClient) { showView('setup'); setStatus('error'); toast('Supabaseの読み込みに失敗しました。通信を確認してください'); return; }
+    $('resetCfgBtn').hidden = !cfg.fromLocal;
+
+    sb = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession:true, autoRefreshToken:true } });
+    sb.auth.onAuthStateChange(function(event, session){
+      setTimeout(function(){ handleSession(session); }, 0);
+    });
+    try {
+      var r = await sb.auth.getSession();
+      handleSession(r.data && r.data.session);
+    } catch(e){ handleSession(null); }
+
+    document.addEventListener('visibilitychange', function(){
+      if (!document.hidden && currentUid) scheduleReload();
+    });
+  }
+  start();
 })();
 </script>
 </body>
